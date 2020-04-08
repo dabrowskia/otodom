@@ -1,0 +1,1 @@
+rmarkdown::render('otodom_ab/reports/ab_testing.Rmd')
