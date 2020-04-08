@@ -1,0 +1,52 @@
+---
+title: "R Notebook"
+output:
+  html_document:
+    df_print: paged
+---
+
+## Wstęp {.tabset}
+
+Serwis Otodom w ostatnich latach inwestował duże nakłady finansowe na marketing, co pozwoliło na znacznie zwiększenie liczby potencjalnych kupujących. Inwestycje przynoszą korzyści ogłoszeniodawcom, którzy dzięki większemu zainteresowaniu otrzymują zdecydowanie więcej zapytań.
+Z uwagi na to, serwis zaczął zastanawiać się, czy mógłby zwiększyć ceny za dodawanie ogłoszeń, żeby zapewnić sobie możliwość dalszych inwestycji.
+
+Zarząd zdecydował o przeprowadzeniu testów cenowych dla użytkowników dodających ogłoszenia celem ustalenia optymalnej ceny. W praktyce poszczególnym klientom pokazywano różne ceny za te same usługi.
+W każdej kategorii klient może skorzystać z 3 pakietów i na ten moment zdecydowano się na testowanie tylko jednego z nich dla każdej z kategorii.
+Celem dla serwisu jest maksymalizacja przychodów przy jednocześnie jak najmniejszej stracie liczby ogłoszeń. Ogłoszenia są dla serwisu niezwykle istotne i nie może sobie pozwolić na zbyt duże straty. 
+Przygotuj kompleksową analizę danych, której wynikiem będą rekomenacje co do wprowadzenia lub nie nowych cen w danych kategoriach.
+
+```{r setup, message=FALSE, warning=FALSE, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+load('../data/input_data.RData')
+```
+
+
+### Eksploracja danych 
+
+```{r}
+
+```
+
+
+### A/B testing 
+
+### Odpowiedzi na pytania 
+ 
+Jaka powinna być cena za nasze usługi?
+```{r}
+
+```
+
+Czy wprowadzenie nowych cenników nie spowoduje odpływu klientów, jeżeli tak, to jakich strat możemy się spodziewać?
+```{r}
+
+```
+
+Czy wyniki są istotne statystycznie, czy jednak serwis powinien prowadzić dalej testy?
+```{r}
+
+```
+
+
+Pamiętaj, że wyższa cena również niejako motywuje klientów do skorzystania z innych pakietów.
