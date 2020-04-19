@@ -1,5 +1,5 @@
 ---
-title: "R Notebook"
+title: "Zadanie rekrutacyjne - Otodom"
 output:
   html_document:
     df_print: paged
@@ -12,41 +12,459 @@ Z uwagi na to, serwis zaczął zastanawiać się, czy mógłby zwiększyć ceny 
 
 Zarząd zdecydował o przeprowadzeniu testów cenowych dla użytkowników dodających ogłoszenia celem ustalenia optymalnej ceny. W praktyce poszczególnym klientom pokazywano różne ceny za te same usługi.
 W każdej kategorii klient może skorzystać z 3 pakietów i na ten moment zdecydowano się na testowanie tylko jednego z nich dla każdej z kategorii.
+
 Celem dla serwisu jest maksymalizacja przychodów przy jednocześnie jak najmniejszej stracie liczby ogłoszeń. Ogłoszenia są dla serwisu niezwykle istotne i nie może sobie pozwolić na zbyt duże straty. 
 Przygotuj kompleksową analizę danych, której wynikiem będą rekomenacje co do wprowadzenia lub nie nowych cen w danych kategoriach.
 
-```{r setup, message=FALSE, warning=FALSE, include=FALSE}
+### Zebranie danych
+
+```{r setup, message=FALSE, warning=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(dplyr)
-load('../data/input_data.RData')
+library(pander)
+library(DBI)
+library(tidyr)
+library(lubridate)
+library(ggplot2)
+library(magrittr)
+
+#system("psql -U postgres -h 127.0.0.1 -f ./data/ab_data.sql")
+#system("psql -U postgres -h 127.0.0.1 -f ./data/pp_users.sql")
+# db_user <- rstudioapi::askForPassword("Database user")
+# db_password <- rstudioapi::askForPassword("Database password")
+db <- 'postgres'
+host_db <- '127.0.0.1'
+db_port <- '5432'  # or any other port specified by the DBA
+db_user <- 'postgres'  
+db_password <- '07557Addab1'
+con <- dbConnect(RPostgres::Postgres(), 
+                 dbname = db, 
+                 host=host_db, 
+                 port=db_port, 
+                 user=db_user, 
+                 password=db_password)  
+ab_data.query <- 'SELECT * FROM public.ab_data'
+ab_data <- dbGetQuery(con, ab_data.query)
+pp_users.query <- 'SELECT * FROM public.pp_users'
+pp_users <- dbGetQuery(con, pp_users.query)
+pp_users <- pp_users %>% 
+  mutate_all(as.character)
+
+all_data <- ab_data %>% left_join(pp_users, by = 'user_id')
+all_data$group_pp <- ifelse(all_data$group_pp.x=='', all_data$group_pp.y, all_data$group_pp.x) %>% 
+  as.factor()
+all_data$created_at  <- all_data$created_at %>% as.Date()
+all_data$price <- as.numeric(all_data$price)
+all_data <- all_data %>% 
+  select(-c(group_pp.x,group_pp.y))
+```
+
+`r sum(is.na(all_data$group_pp))` użytkowników nie posiada żadnego przypisania do grupy, w związku z czym zostaną oni usunięci z analizy.
+
+```{r additionalFunctions}
+roundUp <- function(x){
+  round(x/100, 0)*100
+}
+calc_price <- function(x, mean=TRUE){
+  prices <- names(x) %>% as.numeric()
+  pricesVector <- vector(mode="numeric", length=length(prices))
+
+  for(i in 1:length(prices)){
+      pricesVector[i] <- prices[i]*x[i]
+  }
+  if(mean==TRUE){
+    sum(pricesVector)/sum(x)
+  } else {
+    sum(pricesVector)/sum(x[2:length(x)])
+  }
+  
+  
+}
+
+calc_decrease_client <- function(x){
+  round(x[1]/sum(x),2)
+}
+
+
+```
+
+```{r constants}
+colorgroup <- tibble(group = factor(1:3), col = c('dark green',' dark red',' dark blue'))
 ```
 
 
-### Eksploracja danych 
+### Eksploracja i czyszczenie danych 
+
+Czyszczenie danych
+
+1. usunięcie osób bez przypisanej grupy
+```{r echo = TRUE}
+all_data <- all_data %>% 
+  filter(!is.na(group_pp))
+```
+
+2. Ponieważ w treści zadania zauwazyć można iż "zdecydowano się na testowanie tylko jednego z nich dla każdej z kategorii" tylko jedna kategoria musi zostać wybrana do analizy oraz kategoria bazowa. Z informacji otrzymanych w korespondencji mailowej wynika, że testowany był pakiet "75".
 
 ```{r}
+table(all_data$category_id, 
+                     all_data$id_index) %>% 
+  addmargins() %>% 
+  pander()
+```
+Pakiet "0" jest w rzeczywistości sytuacją, w której użytkownik nie zdecydował się na kupno pakietu, a więc nie poniósł żadnych kosztów (price == 0), a status pozostał nieopłacony (status == 'unpaid'). Testowany pakiet "75" posiada `r nrow(all_data[all_data$id_index == 75,])` ogłoszeń.
 
+
+```{r}
+wybrany_pakiet <- 75
+data_all_packages <- all_data
+all_data <- all_data %>% 
+  filter(id_index %in% c(0,wybrany_pakiet))
+```
+
+Liczba ogłoszeń wczucanych przez użytkowników:
+```{r}
+all_data %>% 
+  filter(id_index == wybrany_pakiet) %>% 
+  select(user_id) %>% 
+  table() %>% 
+  table() %>% 
+  pander()
+```
+
+Na ogół użytkownicy wrzucali po 1-2 ogłoszenia.
+
+czy zdarza się, że więcej niż jedno ogłoszenie ma ten sam identyfikator?
+```{r}
+all_data$id <- 1:nrow(all_data)
+duplicated_rows <- all_data %>% 
+  select(-created_at, -id) %>% 
+  duplicated() 
+duplicated_data <- all_data %>% 
+  filter(ad_id %in% all_data$ad_id[duplicated(all_data$ad_id)]) %>% 
+  arrange(ad_id)
+duplicated_without_date <- duplicated_data %>% select(-created_at) %>% unique() 
+
+duplicated_data
+```
+
+`r nrow(duplicated_data)` ogłszeń posiada zduplikowany identyfikator. Są zgłaszane przez tego samego użytkownika, nieopłacone i są duplikatami powstałymi w różnych dniach, ale przynależącymi do tej samej kategorii i wewnątrz tych samych grup testowych. Ponieważ przypisane są do tych samych użytkowników można usunąć duplikaty z analizy pozostawiając unikatowe (poza datą utworzenia) rekordy. Jednocześnie zaleca się zweryfikować, dlaczego mogą powtarzać się identyfikatory ogłoszeń - taka sytuacja nie powinna mieć miejsca.
+
+```{r}
+all_data <- all_data %>% 
+  filter(!id %in% all_data[duplicated_rows,'id'])
 ```
 
 
-### A/B testing 
+Struktura danych testowania cen:
+```{r}
+all_data <- all_data %>% 
+  mutate(status = factor(status),
+         category_id = factor(category_id),
+         id_index = factor(id_index))
+all_data %>% 
+  glimpse()
+```
 
-### Odpowiedzi na pytania 
+```{r}
+all_data %>% 
+  summary()
+```
+```{r}
+all_data$price %>% 
+  table()
+```
+
+
+Podział użytkowników na grupy testowe wg kategorii:
+```{r}
+userGroups <- table(all_data$category_id, 
+                    all_data$group_pp) 
+userGroups %>% 
+  addmargins() %>% 
+  pander()
+
+```
+
+W każdej z 4 kategorii podział pomiędzy grupami testowymi nie jest znacznie zaburzony. Zaobserwować można, że w 3-ciej grupie testowej jest zawsze najmniej ogłoszeń. Może to wynikać również ze średniej ceny, która jak widać poniżej wzrasta wraz z kolejnym numerem grupy:
+
+```{r}
+mean_price <- all_data %>%
+  filter(id_index == wybrany_pakiet) %>% 
+  group_by(category_id,group_pp) %>% 
+    summarise(n = n(),
+              mean_price = mean(price))
+mean_price 
+
+```
+
+```{r}
+mean_price %>%  ggplot(aes(as.numeric(group_pp), mean_price, col = category_id))+
+  geom_line() + 
+  theme_light() + 
+  labs(y="średnia cena", x = "groupa testowa") + 
+  scale_x_discrete(limits=c("1","2","3"))
+```
+
+
+### Analiza danych
+
+Mimo, że testujemy pakiet nr "75" należy zadać sobie pytanie, czy istnieją statystycznie istotne różnice pomiędzy grupami testowymi w kwestii wyboru pakietu.
+
+```{r, results="asis"}
+panderOptions('knitr.auto.asis', FALSE)
+
+for (category in unique(data_all_packages$category_id)){
+  print(category)
+  data_all_packages %>% filter(category_id == category) %>%
+    with(table(group_pp,price)) %>% 
+    addmargins() %>% 
+    pander() 
+    
+}
+
+```
+
+Można zaobserwować, że każda grupa testowa różniła się ceną jednego pakietu ("75"), podczas gdy pozostałe pakiety miały ustaloną wartość. Pojawiają się pondto pewne sepcyficzne ogłoszenia, które mają inną cenę, co może wynikać ze zmiany kategorii ogłoszenia, do którego zostało przypisane (np. użytkownik zapłacił za ogłoszenie 42 zł w jednej kategorii, które to następnie zostało przenisione do innej kategorii). W związku z powyższym możemy założyć, że róznice w wyborze pakietu wynikały z ceny tego konkretnego pakietu (lub różnic cenowych pomiędzy tym pakietem, a pozostałymi), a więc możemy odrzucić pozostałe pakiety z analizy kosztu. Zanim jednak to zrobimy warto spojrzeć, czy wzrost ceny pakietu "75" przekładał się na wzrost zakupionych innych pakietów:
+
+```{r}
+plotAdvertsiements <- function(category){
+  data_all_packages %>% 
+    filter(category_id == category) %>%
+    with(table(group_pp,price)) %>% 
+    addmargins() %>%
+    as.data.frame.matrix() %<>%
+    sapply('/', .[,'Sum']) %>% 
+    as.data.frame.matrix() %>% 
+    mutate(group = c(1:3,"all")) %>% 
+    select(-Sum) %>% 
+    gather(price,n,-group) %>% 
+    filter(n!=0 & group != "all") %>% 
+    ggplot(aes(as.numeric(price),n, col = group)) +
+    geom_line(lwd = 1)+
+    geom_point() + 
+    theme_light() + 
+    labs(x= "Cena", y = "Udział ogłoszeń") 
+}
+
+
+```
+
+```{r}
+plotAdvertsiements(102)
+```
+
+```{r}
+plotAdvertsiements(201)
+```
+
+```{r}
+plotAdvertsiements(502)
+```
+
+```{r}
+plotAdvertsiements(401)
+```
+
+poza kategorią 401 można zaobserwować, że kiedy cena najtańszego pakietu (pakietu nr 75) wzrosła w grupie 3 do maksymalnej wartości większy udział osób zaczęła wykupywać droższy pakiet. W kategorii 401 taką sytuację można zaobserwować już od drugiej grupy testowej. Należy mieć to na uwadze, gdyż ogólny przychód z danej kategorii nie będzie uzależniony tylko od ceny poszczególnych pakietów, ale również od relacji pomiędzy nimi (różnicy cen i zawartości pakietów) - gdy cena jednego pakietu za bardzo zbliży się do ceny drugiego nagle niewiele droższy pakiet o lepszej zawartości staje się bardziej atrakcyjny. 
+
+Dalsza analiza oparta jest o ogłoszenia z pakietu nr "75" bez uwzględnienia pozostałych pakietów ponieważ ich ceny pozostały bez zmian.
+
+Wybrane ceny pakietów wg grup testowych w poszczególnych kategoriach:
+(**przychod_jednost** - przychód całkowity podzielony przez wszystkie ogłoszenia opłacone i nieopłacone; **odpływ klientów** liczony jest jako udział ogłoszeń nieopłaconych - *unpaid* do we wszystkich ogłoszeniach w danej grupie testowej;)
+
+```{r, results="asis"}
+panderOptions('knitr.auto.asis', FALSE)
+
+for(category in sort(unique(all_data$category_id))){
+  print(category)
+  data_price <- all_data %>%
+    filter(category_id == category) %>% 
+    with(table(group_pp, price))
+
+  data_price <- data_price %>%  
+    as.data.frame.matrix() %>% 
+    mutate(przychod_jednost = apply(.,1, FUN = calc_price),
+           odplyw_klientow = apply(., 1, FUN = calc_decrease_client)) 
+  assign(paste0("data_price_",category),data_price)
+
+    data_price %>% 
+    pander()
+  
+}
  
-Jaka powinna być cena za nasze usługi?
-```{r}
-
 ```
+
+
+
+**ANALIZA CZASOWA OGŁOSZEŃ**
+
+Czy działania użytkowników odbywały się w tym samym czasie?
+Całkowita liczba ogłoszeń tygodniowo w podziale na kategorie i grupy testowe:
+```{r}
+all_data %>%
+  group_by(week = week(created_at), category_id, group_pp) %>%
+  count() %>% 
+  ggplot(aes(x= week, y = n, col = group_pp)) + 
+  geom_line(lwd = 1) +
+  facet_grid(~category_id) + 
+  theme_light() +
+  labs(y="liczba ogłoszeń", x = "tydzień")
+```
+
+najwięcej ogłoszeń pojawiło się w aktegorii "102". Wyraźnie można również zaobserwować, że w grpie testowej nr 3 tygodniowo było mniej ogłoszeń niż w pozostałych grupach testowych. Należy jednak zauważyć, że częściowo może to wynikać z tego, że do trzeciej grupy wybrano również znacząco mniej użytkowników:
+```{r}
+liczba_uzytkownikow <- all_data %>%
+  select(user_id,group_pp, category_id) %>%
+  distinct() %>%
+  group_by(group_pp, category_id) %>%
+  summarise(liczba_uzytkownikow = n())
+
+liczba_ogloszen <-all_data %>%
+  select(ad_id, group_pp, category_id) %>%
+  distinct() %>%
+  group_by(group_pp, category_id) %>%
+  summarise(liczba_ogloszen = n())
+
+liczba_uzytkownikow %>% 
+  group_by(group_pp) %>% 
+  summarise(n = sum(liczba_uzytkownikow))
+```
+
+Również liczba ogłoszeń w wwyższej grupie jest niższa:
+```{r}
+liczba_ogloszen %>% 
+  group_by(group_pp) %>% 
+  summarise(n = sum(liczba_ogloszen))
+```
+
+W podziale na kategorie można zaobserwować również pewne zróżnicowanie:
+```{r}
+liczba_uzytkownikow %>% 
+  ggplot(aes(group_pp, liczba_uzytkownikow, fill = category_id)) + 
+  geom_col()+ 
+  theme_light() + 
+  labs(y= "Liczba użytkowników")
+```
+
+```{r}
+liczba_ogloszen %>% 
+  ggplot(aes(group_pp, liczba_ogloszen, fill = category_id)) + 
+  geom_col()+ 
+  theme_light() + 
+  labs(y= "Liczba ogłoszeń")
+```
+
+
+Udział *opłaconych* ogłoszeń tygodniowo w podziale na kategorie i grupy testowe we wszystkich ogłoszeniach w danej kategorii:
+```{r}
+all_data <- all_data %>% 
+  left_join(liczba_ogloszen, by = c("category_id", "group_pp"))
+
+all_data %>%
+  filter(status == 'paid') %>% 
+  group_by(week = week(created_at), category_id, group_pp) %>%
+  summarise(n=n(),liczba_ogloszen = median(liczba_ogloszen)) %>% 
+  ggplot(aes(x= week, y = n/liczba_ogloszen, col = group_pp)) + 
+  geom_line(lwd = 1) +
+  facet_grid(~category_id) + 
+  theme_light() +
+  labs(y="liczba opłaconych ogłoszeń", x = "tydzień")
+```
+
+Liczba *nieopłaconych* ogłoszeń tygodniowo w podziale na kategorie i grupy testowe w przeliczeniu na jednego użytkownika:
+```{r}
+all_data %>%
+  filter(status == 'unpaid') %>% 
+  group_by(week = week(created_at), category_id, group_pp) %>%
+ summarise(n=n(),liczba_ogloszen = median(liczba_ogloszen)) %>% 
+  ggplot(aes(x= week, y = n/liczba_ogloszen, col = group_pp)) + 
+  geom_line(lwd = 1) +
+  facet_grid(~category_id) + 
+  theme_light() +
+  labs(y="Udział nieopłaconych ogłoszeń", x = "tydzień")
+```
+
+Im wyższa cena pakietu, tym wyższy udział nieopłaconych ogłoszeń
+
+Udział *opłaconych* ogłoszeń w całkowitej liczbie ogłoszeń tygodniowo w podziale na kategorie i grupy testowe:
+```{r}
+all_data %>%
+  group_by(week = week(created_at), category_id, group_pp, status) %>%
+  count() %>% 
+  spread(status, n) %>% 
+  ggplot(aes(x= week, y = paid/(paid+unpaid), col = group_pp)) + 
+  geom_line(lwd = 1) +
+  facet_grid(~category_id) + 
+  theme_light() +
+  labs(y="Udział opłaconych ogłoszeń", x = "tydzień")
+```
+
+Przychód z *opłaconych* ogłoszeń tygodniowo:
+```{r}
+all_data %>%
+  filter(status == 'paid') %>% 
+  group_by(week = week(created_at), category_id, group_pp) %>%
+  summarise(przychod = sum(price)) %>% 
+  ggplot(aes(x= week, y = przychod, col = group_pp)) + 
+  geom_line(lwd = 1) +
+  facet_grid(~category_id) + 
+  theme_light() +
+  labs(y="Przychód z ogłoszeń opłaconych", x = "tydzień")
+```
+
+Testy pakietu zostały przeprowadzone w tym samym czasie dla każdej grupy testowej, co umożliwia porównywanie wyników. Warto zadać sobie pytanie, skąd obserwowalne duże różnice w poszczególnych tygodniach widoczne szczególnie w kategorii "102", dla której w 8 i 9 tygodniu roku przychód jak i liczba ogłoszeń oraz (co istotne) udział ogłoszeń nieopłaconych znacznie wzrosły.
+
+
+### Wnioski
+
+
+**Jaka powinna być cena za nasze usługi?**
+
+Z analizy wynika, że im wyższa cena proponowana za pakiet, tym większy odpływ klientów. Jednocześnie im wyższa cena tym wyższy uzyskany przychód jednostkowy. Jak wykazano wcześniej, liczba ogłoszeń wykupionych w danym pakiecie w danej kategorii zależy jednocześnie od cen pozostałych pakietów.
+
+
+W poszczególnych kategoriach średnia cena ustalona na podstawie przeprowadzonych testów wynosi:
+
+102: **`r round(mean(data_price_102$przychod_jednost), 2)`**
+
+201: **`r round(mean(data_price_201$przychod_jednost), 2)`**
+
+401: **`r round(mean(data_price_401$przychod_jednost), 2)`**
+
+502: **`r round(mean(data_price_502$przychod_jednost), 2)`**
+
 
 Czy wprowadzenie nowych cenników nie spowoduje odpływu klientów, jeżeli tak, to jakich strat możemy się spodziewać?
-```{r}
 
-```
+W załączonych plikach brak informacji o obecnym odpływie klientów
+
 
 Czy wyniki są istotne statystycznie, czy jednak serwis powinien prowadzić dalej testy?
 ```{r}
-
+for(category in sort(unique(all_data$category_id))){
+  all_data %>% 
+    filter(category_id == category) %>% 
+    lm(formula = price~group_pp) %>%
+    anova() %>% 
+    pander()
+}
 ```
 
 
 Pamiętaj, że wyższa cena również niejako motywuje klientów do skorzystania z innych pakietów.
+
+### Moje pytania 
+
+
+### Dalsze pytania 
+
+1. Co wpływa na wybór pakietu,
+2. Czy da się opracować model szacujący maksymalną wysokość ceny pakietu dla poszczególnych klientów?
+
+### Dalszy rozwój rozwiązania
+
+1. Przeprowadzenie testów, gdzie każda grupa testowa ma tylko jeden zaproponowany wariant cenowy.
+1. Proponowane rozwiązanie można **usprawnić zamykając je w kontenerze i umieszczając na serwerze udostępniając jednocześnie komnikację z narzędziem poprzez REST**. 
+2. Zbudowanie **aplikacji Shiny**, w której można będzie zdefiniować maksymalny dopuszczalny poziom odpływu klientów, by zwizualizować szacowany zysk przy danej cenie.
+
+
