@@ -39,4 +39,4 @@ vignettes/*.pdf
 .Renviron
 
 # Data
-/otodom_ab/data/*
+/otodom_ab/data/*.sql
