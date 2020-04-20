@@ -39,4 +39,5 @@ vignettes/*.pdf
 .Renviron
 
 # Data
-/otodom_ab/data/*.sql
+/otodom_ab/data/ab_data.sql
+/otodom_ab/data/pp_users.sql
