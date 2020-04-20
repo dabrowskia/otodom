@@ -3,6 +3,10 @@ title: "Zadanie rekrutacyjne - Otodom"
 output:
   html_document:
     df_print: paged
+params: 
+  db_user: "postgres"
+  db_password: "****"
+
 ---
 
 ## Wstęp {.tabset}
@@ -30,13 +34,11 @@ library(magrittr)
 
 #system("psql -U postgres -h 127.0.0.1 -f ./data/ab_data.sql")
 #system("psql -U postgres -h 127.0.0.1 -f ./data/pp_users.sql")
-# db_user <- rstudioapi::askForPassword("Database user")
-# db_password <- rstudioapi::askForPassword("Database password")
+db_user <- params$db_user
+db_password <- params$db_password
 db <- 'postgres'
 host_db <- '127.0.0.1'
-db_port <- '5432'  # or any other port specified by the DBA
-db_user <- 'postgres'  
-db_password <- '07557Addab1'
+db_port <- '5432'  
 con <- dbConnect(RPostgres::Postgres(), 
                  dbname = db, 
                  host=host_db, 
@@ -88,10 +90,6 @@ calc_decrease_client <- function(x){
 
 ```
 
-```{r constants}
-colorgroup <- tibble(group = factor(1:3), col = c('dark green',' dark red',' dark blue'))
-```
-
 
 ### Eksploracja i czyszczenie danych 
 
@@ -106,8 +104,8 @@ all_data <- all_data %>%
 2. Ponieważ w treści zadania zauwazyć można iż "zdecydowano się na testowanie tylko jednego z nich dla każdej z kategorii" tylko jedna kategoria musi zostać wybrana do analizy oraz kategoria bazowa. Z informacji otrzymanych w korespondencji mailowej wynika, że testowany był pakiet "75".
 
 ```{r}
-table(all_data$category_id, 
-                     all_data$id_index) %>% 
+table(all_data$category_id,
+      all_data$id_index) %>% 
   addmargins() %>% 
   pander()
 ```
@@ -118,7 +116,7 @@ Pakiet "0" jest w rzeczywistości sytuacją, w której użytkownik nie zdecydowa
 wybrany_pakiet <- 75
 data_all_packages <- all_data
 all_data <- all_data %>% 
-  filter(id_index %in% c(0,wybrany_pakiet))
+  filter(id_index %in% c(0, wybrany_pakiet))
 ```
 
 Liczba ogłoszeń wczucanych przez użytkowników:
@@ -151,7 +149,7 @@ duplicated_data
 
 ```{r}
 all_data <- all_data %>% 
-  filter(!id %in% all_data[duplicated_rows,'id'])
+  filter(!id %in% all_data[duplicated_rows, 'id'])
 ```
 
 
@@ -167,11 +165,14 @@ all_data %>%
 
 ```{r}
 all_data %>% 
-  summary()
+  summary() %>% 
+  pander()
 ```
+
 ```{r}
 all_data$price %>% 
-  table()
+  table() %>% 
+  pander()
 ```
 
 
@@ -420,51 +421,94 @@ Testy pakietu zostały przeprowadzone w tym samym czasie dla każdej grupy testo
 
 **Jaka powinna być cena za nasze usługi?**
 
-Z analizy wynika, że im wyższa cena proponowana za pakiet, tym większy odpływ klientów. Jednocześnie im wyższa cena tym wyższy uzyskany przychód jednostkowy. Jak wykazano wcześniej, liczba ogłoszeń wykupionych w danym pakiecie w danej kategorii zależy jednocześnie od cen pozostałych pakietów.
+Z analizy wynika, że im wyższa cena proponowana za pakiet, tym większy odpływ klientów. 
+Jednocześnie im wyższa cena tym wyższy uzyskany przychód jednostkowy. 
+Jednakże, jak wykazano wcześniej, liczba ogłoszeń wykupionych w danym pakiecie w danej kategorii zależy jednocześnie od cen pozostałych pakietów, a więc jeśli wprowadzimy zmianę w jednym z nich należy zakładać, że wprowadzenie w kolejnej fazie testów zmiany ceny w innym (w domyśle droższym) pakiecie może mieć również wpływ na sprzedaż pakeitu o cenie niższej.
 
+Jeśli jednak opierać się tylko na wynikach uzyskanych w przeprowadzonym eksperymentu teście można pokusić się o analizę, czy przychód jednostkowy rozumiany jako średni przychód z ogłoszenia w danej kategorii różni się istotnie statystycznie pomiędzy grupami testowymi.
+Zadanie to jest o tyle trudne, że nie mówimy tu o rozkładzie normalnym wartości (cen), jak również populacje są z gruntu różne ponieważ ceny podawane grupom testowym były różne. 
+W związku z powyższym proponwany jest test Kruskalla-Wallisa w celu określenia różnic w średniej cenie pomiędzy grupami.
 
-W poszczególnych kategoriach średnia cena ustalona na podstawie przeprowadzonych testów wynosi:
+```{r, results="asis"}
+kruskal.test(data_all_packages$price,
+             data_all_packages$group_pp) %>% 
+  pander()
 
-102: **`r round(mean(data_price_102$przychod_jednost), 2)`**
-
-201: **`r round(mean(data_price_201$przychod_jednost), 2)`**
-
-401: **`r round(mean(data_price_401$przychod_jednost), 2)`**
-
-502: **`r round(mean(data_price_502$przychod_jednost), 2)`**
-
-
-Czy wprowadzenie nowych cenników nie spowoduje odpływu klientów, jeżeli tak, to jakich strat możemy się spodziewać?
-
-W załączonych plikach brak informacji o obecnym odpływie klientów
-
-
-Czy wyniki są istotne statystycznie, czy jednak serwis powinien prowadzić dalej testy?
-```{r}
-for(category in sort(unique(all_data$category_id))){
-  all_data %>% 
-    filter(category_id == category) %>% 
-    lm(formula = price~group_pp) %>%
-    anova() %>% 
-    pander()
-}
 ```
 
 
-Pamiętaj, że wyższa cena również niejako motywuje klientów do skorzystania z innych pakietów.
+Jak wynika z przeprowadzonego testu średni przychód z ogłoszenia różni sie istotnie pomiędzy grupami. 
+Przychód z ogłoszenia jest najwyższy w trzeciej grupie testowej, a więc dla najwyższej ceny w danej kategorii. 
 
-### Moje pytania 
 
 
-### Dalsze pytania 
+W poszczególnych kategoriach proponowana na podstawie przeprowadzonych testów cena wynosi:
 
-1. Co wpływa na wybór pakietu,
-2. Czy da się opracować model szacujący maksymalną wysokość ceny pakietu dla poszczególnych klientów?
+102: **`r colnames(data_price_102)[4]`**
+
+201: **`r colnames(data_price_201)[4]`**
+
+401: **`r colnames(data_price_401)[5]`**
+
+502: **`r colnames(data_price_502)[4]`**
+
+
+**Czy wprowadzenie nowych cenników nie spowoduje odpływu klientów, jeżeli tak, to jakich strat możemy się spodziewać?**
+
+Wzrost ceny wiąże się z większym odsetkiem osób rezygnujących z pulikacji ogłoszenia.
+Warto pokusić się o sprawdzenie, czy różnice w odsetku osób rezygnujących z ogłoszenia jest również istotny statystycznie.
+
+```{r, results="asis"}
+data_all_packages %>%
+  mutate(status2 = factor(status, labels = c(0,1),levels = c('unpaid','paid'))) %>% 
+  with(.,kruskal.test(status2, group_pp)) %>% 
+  pander()
+```
+
+Również w przypadku różnic w  udziale osób rezygnujących z ogłoszenia można stwierdzić statystyczną istotność.
+
+Wysokość odpływu klientów w zależności od kategorii oraz grupy testowej (ceny pakietu) zaprezentowano już w zakładce *Analiza Danych*, ale dla przypomnienia:
+
+```{r, results="asis"}
+
+for(category in sort(unique(all_data$category_id))){
+  print(category)
+  data_price <- all_data %>%
+    filter(category_id == category) %>% 
+    with(table(group_pp, price))
+
+  data_price <- data_price %>%  
+    as.data.frame.matrix() %>% 
+    mutate(odplyw_klientow = apply(., 1, FUN = calc_decrease_client)) 
+  assign(paste0("data_price_",category),data_price)
+
+    data_price %>% 
+    pander()
+  
+}
+```
+
+Procentowy udział osób rezygnujących z publikacji ogłoszeń mieści się w zakresie od ok 30 do 50% w zależności od kategorii i grupy testowej.
+
+Wzrost ceny rekompensuje odpływ klientów, jednak, jak wcześniej pisałem, należy sobie zadać pytanie co jest ważniejsze: przychód w danym momencie, czy stabilny udział w rynku.
+
+**Czy wyniki są istotne statystycznie, czy jednak serwis powinien prowadzić dalej testy?**
+
+Choć wyniki są istotne statystycznie należy kontynuować testy jednak zmieniając ceny pozostałych pakietów i poszukując optimum ceny w stosunku do sprzedaży.
+Należy dobrze zastanowić się nad metrykami, które chce się optymalizować.
+Maksymalny przychód z ogłoszeń może oznaczać istotnie mniejszy udział na rynku ze względu na liczbę klientów, która może przenieść się do konkurencji i w dłuższej perspektywie czasowej może spowodować dodatnie sprzężenie zwrotne w postaci narastającego odpływu klientów.
+Pojawia się w związku z tym szereg pytań, które zostały zaprezentowane poniżej:
+
+1. Jaki jest maksymalny odpływ klientów dopuszczalny przez firmę w danej kategorii (lub inaczej mówiąc: jaki udział rynku możemy oddać konkurencji)?
+2. Co wpływa na wybór pakietu? Czy istnieje relacja pomiędzy wiekiem, płcią i wykształceniem, a decyzją o kupnie pakietu w danej kategorii? Czy miejsce zamieszkania może stanowić proxy zamożności klienta i jednocześnie wpływać na wartość pakietu jaką jest gotów zapłacić?
+3. Czy da się opracować model szacujący maksymalną wysokość ceny pakietu dla poszczególnych klientów? nie wykluczone, że zależność pomiędzy przychodem a ceną posiada kształt funkcji zbliżonej do normalnej krzywej Gaussa, gdzie punkt maksymalnego przychodu jest jednocześnie punktem, w którym wysokość ceny sprawia, że więcej osób rezygnuje z ogłoszenia niż zwraca się koszt tych ogłoszeń w jego cenie.
+4. Jeżeli takie cechy jak płeć, czy wiek wpływają na gotowość zakupu droższego pakietu, czy prezentowanie różnych cen na podstawie tych cech jest legalne i moralnie właściwe, czy stanowi swego rodzaju dyskryminację?
 
 ### Dalszy rozwój rozwiązania
 
-1. Przeprowadzenie testów, gdzie każda grupa testowa ma tylko jeden zaproponowany wariant cenowy.
-1. Proponowane rozwiązanie można **usprawnić zamykając je w kontenerze i umieszczając na serwerze udostępniając jednocześnie komnikację z narzędziem poprzez REST**. 
-2. Zbudowanie **aplikacji Shiny**, w której można będzie zdefiniować maksymalny dopuszczalny poziom odpływu klientów, by zwizualizować szacowany zysk przy danej cenie.
+1. Przeprowadzenie kolejnych testów ze zmianami cen w pozostałych pakietach.
+2. Proponowane rozwiązanie można **usprawnić zamykając je w kontenerze (dockeryzacja) i umieszczając na serwerze udostępniając jednocześnie komunikację z utworzonym narzędziem poprzez REST**. 
+3. Zbudowanie **aplikacji Shiny**, w której można będzie zdefiniować maksymalny dopuszczalny poziom odpływu klientów, by zwizualizować szacowany zysk przy danej cenie.
+4. Zbudowanie zespołu analitycznego, do zaplanowania długofalowego, wielofazowego eksperymentu oraz możliwości statystycznej analizy danych.
 
 

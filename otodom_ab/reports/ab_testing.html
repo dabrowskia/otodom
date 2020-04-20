@@ -1655,13 +1655,11 @@ library(magrittr)
 
 #system(&quot;psql -U postgres -h 127.0.0.1 -f ./data/ab_data.sql&quot;)
 #system(&quot;psql -U postgres -h 127.0.0.1 -f ./data/pp_users.sql&quot;)
-# db_user &lt;- rstudioapi::askForPassword(&quot;Database user&quot;)
-# db_password &lt;- rstudioapi::askForPassword(&quot;Database password&quot;)
+db_user &lt;- params$db_user
+db_password &lt;- params$db_password
 db &lt;- &#39;postgres&#39;
 host_db &lt;- &#39;127.0.0.1&#39;
-db_port &lt;- &#39;5432&#39;  # or any other port specified by the DBA
-db_user &lt;- &#39;postgres&#39;  
-db_password &lt;- &#39;07557Addab1&#39;
+db_port &lt;- &#39;5432&#39;  
 con &lt;- dbConnect(RPostgres::Postgres(), 
                  dbname = db, 
                  host=host_db, 
@@ -1705,7 +1703,6 @@ calc_price &lt;- function(x, mean=TRUE){
 calc_decrease_client &lt;- function(x){
   round(x[1]/sum(x),2)
 }</code></pre>
-<pre class="r"><code>colorgroup &lt;- tibble(group = factor(1:3), col = c(&#39;dark green&#39;,&#39; dark red&#39;,&#39; dark blue&#39;))</code></pre>
 </div>
 <div id="eksploracja-i-czyszczenie-danych" class="section level3">
 <h3>Eksploracja i czyszczenie danych</h3>
@@ -1718,8 +1715,8 @@ calc_decrease_client &lt;- function(x){
 <ol start="2" style="list-style-type: decimal">
 <li>Ponieważ w treści zadania zauwazyć można iż “zdecydowano się na testowanie tylko jednego z nich dla każdej z kategorii” tylko jedna kategoria musi zostać wybrana do analizy oraz kategoria bazowa. Z informacji otrzymanych w korespondencji mailowej wynika, że testowany był pakiet “75”.</li>
 </ol>
-<pre class="r"><code>table(all_data$category_id, 
-                     all_data$id_index) %&gt;% 
+<pre class="r"><code>table(all_data$category_id,
+      all_data$id_index) %&gt;% 
   addmargins() %&gt;% 
   pander()</code></pre>
 <table style="width:61%;">
@@ -1788,7 +1785,7 @@ calc_decrease_client &lt;- function(x){
 <pre class="r"><code>wybrany_pakiet &lt;- 75
 data_all_packages &lt;- all_data
 all_data &lt;- all_data %&gt;% 
-  filter(id_index %in% c(0,wybrany_pakiet))</code></pre>
+  filter(id_index %in% c(0, wybrany_pakiet))</code></pre>
 <p>Liczba ogłoszeń wczucanych przez użytkowników:</p>
 <pre class="r"><code>all_data %&gt;% 
   filter(id_index == wybrany_pakiet) %&gt;% 
@@ -1848,7 +1845,7 @@ duplicated_data</code></pre>
 </div>
 <p>140 ogłszeń posiada zduplikowany identyfikator. Są zgłaszane przez tego samego użytkownika, nieopłacone i są duplikatami powstałymi w różnych dniach, ale przynależącymi do tej samej kategorii i wewnątrz tych samych grup testowych. Ponieważ przypisane są do tych samych użytkowników można usunąć duplikaty z analizy pozostawiając unikatowe (poza datą utworzenia) rekordy. Jednocześnie zaleca się zweryfikować, dlaczego mogą powtarzać się identyfikatory ogłoszeń - taka sytuacja nie powinna mieć miejsca.</p>
 <pre class="r"><code>all_data &lt;- all_data %&gt;% 
-  filter(!id %in% all_data[duplicated_rows,&#39;id&#39;])</code></pre>
+  filter(!id %in% all_data[duplicated_rows, &#39;id&#39;])</code></pre>
 <p>Struktura danych testowania cen:</p>
 <pre class="r"><code>all_data &lt;- all_data %&gt;% 
   mutate(status = factor(status),
@@ -1868,26 +1865,158 @@ all_data %&gt;%
 ## $ group_pp    &lt;fct&gt; 2, 1, 2, 1, 2, 2, 2, 1, 2, 2, 1, 2, 1, 1, 3, 3, 3, 3, 2...
 ## $ id          &lt;int&gt; 1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15, 16, 17,...</code></pre>
 <pre class="r"><code>all_data %&gt;% 
-  summary()</code></pre>
-<pre><code>##    created_at            status        ad_id             user_id         
-##  Min.   :2020-02-13   paid  :2770   Length:4784        Length:4784       
-##  1st Qu.:2020-02-19   unpaid:2014   Class :character   Class :character  
-##  Median :2020-02-25                 Mode  :character   Mode  :character  
-##  Mean   :2020-02-25                                                      
-##  3rd Qu.:2020-03-03                                                      
-##  Max.   :2020-03-08                                                      
-##  category_id id_index      price       group_pp       id      
-##  102:2689    0 :2014   Min.   : 0.00   1:1750   Min.   :   1  
-##  201: 761    75:2770   1st Qu.: 0.00   2:1718   1st Qu.:1220  
-##  401: 999              Median :39.00   3:1316   Median :2434  
-##  502: 335              Mean   :29.64            Mean   :2431  
-##                        3rd Qu.:49.00            3rd Qu.:3641  
-##                        Max.   :69.00            Max.   :4856</code></pre>
+  summary() %&gt;% 
+  pander()</code></pre>
+<table>
+<caption>Table continues below</caption>
+<colgroup>
+<col width="28%"></col>
+<col width="19%"></col>
+<col width="26%"></col>
+<col width="26%"></col>
+</colgroup>
+<thead>
+<tr class="header">
+<th align="center">created_at</th>
+<th align="center">status</th>
+<th align="center">ad_id</th>
+<th align="center">user_id</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">Min. :2020-02-13</td>
+<td align="center">paid :2770</td>
+<td align="center">Length:4784</td>
+<td align="center">Length:4784</td>
+</tr>
+<tr class="even">
+<td align="center">1st Qu.:2020-02-19</td>
+<td align="center">unpaid:2014</td>
+<td align="center">Class :character</td>
+<td align="center">Class :character</td>
+</tr>
+<tr class="odd">
+<td align="center">Median :2020-02-25</td>
+<td align="center">NA</td>
+<td align="center">Mode :character</td>
+<td align="center">Mode :character</td>
+</tr>
+<tr class="even">
+<td align="center">Mean :2020-02-25</td>
+<td align="center">NA</td>
+<td align="center">NA</td>
+<td align="center">NA</td>
+</tr>
+<tr class="odd">
+<td align="center">3rd Qu.:2020-03-03</td>
+<td align="center">NA</td>
+<td align="center">NA</td>
+<td align="center">NA</td>
+</tr>
+<tr class="even">
+<td align="center">Max. :2020-03-08</td>
+<td align="center">NA</td>
+<td align="center">NA</td>
+<td align="center">NA</td>
+</tr>
+</tbody>
+</table>
+<table style="width:93%;">
+<colgroup>
+<col width="19%"></col>
+<col width="15%"></col>
+<col width="22%"></col>
+<col width="15%"></col>
+<col width="20%"></col>
+</colgroup>
+<thead>
+<tr class="header">
+<th align="center">category_id</th>
+<th align="center">id_index</th>
+<th align="center">price</th>
+<th align="center">group_pp</th>
+<th align="center">id</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">102:2689</td>
+<td align="center">0 :2014</td>
+<td align="center">Min. : 0.00</td>
+<td align="center">1:1750</td>
+<td align="center">Min. : 1</td>
+</tr>
+<tr class="even">
+<td align="center">201: 761</td>
+<td align="center">75:2770</td>
+<td align="center">1st Qu.: 0.00</td>
+<td align="center">2:1718</td>
+<td align="center">1st Qu.:1220</td>
+</tr>
+<tr class="odd">
+<td align="center">401: 999</td>
+<td align="center">NA</td>
+<td align="center">Median :39.00</td>
+<td align="center">3:1316</td>
+<td align="center">Median :2434</td>
+</tr>
+<tr class="even">
+<td align="center">502: 335</td>
+<td align="center">NA</td>
+<td align="center">Mean :29.64</td>
+<td align="center">NA</td>
+<td align="center">Mean :2431</td>
+</tr>
+<tr class="odd">
+<td align="center">NA</td>
+<td align="center">NA</td>
+<td align="center">3rd Qu.:49.00</td>
+<td align="center">NA</td>
+<td align="center">3rd Qu.:3641</td>
+</tr>
+<tr class="even">
+<td align="center">NA</td>
+<td align="center">NA</td>
+<td align="center">Max. :69.00</td>
+<td align="center">NA</td>
+<td align="center">Max. :4856</td>
+</tr>
+</tbody>
+</table>
 <pre class="r"><code>all_data$price %&gt;% 
-  table()</code></pre>
-<pre><code>## .
-##    0   39   42   49   59   69 
-## 2014  624   88 1034  754  270</code></pre>
+  table() %&gt;% 
+  pander()</code></pre>
+<table style="width:51%;">
+<colgroup>
+<col width="9%"></col>
+<col width="8%"></col>
+<col width="6%"></col>
+<col width="9%"></col>
+<col width="8%"></col>
+<col width="8%"></col>
+</colgroup>
+<thead>
+<tr class="header">
+<th align="center">0</th>
+<th align="center">39</th>
+<th align="center">42</th>
+<th align="center">49</th>
+<th align="center">59</th>
+<th align="center">69</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">2014</td>
+<td align="center">624</td>
+<td align="center">88</td>
+<td align="center">1034</td>
+<td align="center">754</td>
+<td align="center">270</td>
+</tr>
+</tbody>
+</table>
 <p>Podział użytkowników na grupy testowe wg kategorii:</p>
 <pre class="r"><code>userGroups &lt;- table(all_data$category_id, 
                     all_data$group_pp) 
@@ -2319,7 +2448,7 @@ for(category in sort(unique(all_data$category_id))){
 
   data_price &lt;- data_price %&gt;%  
     as.data.frame.matrix() %&gt;% 
-    mutate(srednia_cena = apply(.,1, FUN = calc_price),
+    mutate(przychod_jednost = apply(.,1, FUN = calc_price),
            odplyw_klientow = apply(., 1, FUN = calc_decrease_client)) 
   assign(paste0(&quot;data_price_&quot;,category),data_price)
 
@@ -2328,14 +2457,14 @@ for(category in sort(unique(all_data$category_id))){
   
 }</code></pre>
 <p>[1] “102”</p>
-<table style="width:79%;">
+<table style="width:86%;">
 <colgroup>
 <col width="8%"></col>
 <col width="8%"></col>
 <col width="8%"></col>
 <col width="8%"></col>
-<col width="20%"></col>
-<col width="25%"></col>
+<col width="26%"></col>
+<col width="26%"></col>
 </colgroup>
 <thead>
 <tr class="header">
@@ -2343,7 +2472,7 @@ for(category in sort(unique(all_data$category_id))){
 <th align="center">39</th>
 <th align="center">49</th>
 <th align="center">59</th>
-<th align="center">srednia_cena</th>
+<th align="center">przychod_jednost</th>
 <th align="center">odplyw_klientow</th>
 </tr>
 </thead>
@@ -2375,14 +2504,14 @@ for(category in sort(unique(all_data$category_id))){
 </tbody>
 </table>
 <p>[1] “201”</p>
-<table style="width:79%;">
+<table style="width:86%;">
 <colgroup>
 <col width="8%"></col>
 <col width="8%"></col>
 <col width="8%"></col>
 <col width="8%"></col>
-<col width="20%"></col>
-<col width="25%"></col>
+<col width="26%"></col>
+<col width="26%"></col>
 </colgroup>
 <thead>
 <tr class="header">
@@ -2390,7 +2519,7 @@ for(category in sort(unique(all_data$category_id))){
 <th align="center">49</th>
 <th align="center">59</th>
 <th align="center">69</th>
-<th align="center">srednia_cena</th>
+<th align="center">przychod_jednost</th>
 <th align="center">odplyw_klientow</th>
 </tr>
 </thead>
@@ -2422,15 +2551,15 @@ for(category in sort(unique(all_data$category_id))){
 </tbody>
 </table>
 <p>[1] “401”</p>
-<table style="width:86%;">
+<table style="width:93%;">
 <colgroup>
 <col width="8%"></col>
 <col width="6%"></col>
 <col width="8%"></col>
 <col width="8%"></col>
 <col width="8%"></col>
-<col width="20%"></col>
-<col width="25%"></col>
+<col width="26%"></col>
+<col width="26%"></col>
 </colgroup>
 <thead>
 <tr class="header">
@@ -2439,7 +2568,7 @@ for(category in sort(unique(all_data$category_id))){
 <th align="center">49</th>
 <th align="center">59</th>
 <th align="center">69</th>
-<th align="center">srednia_cena</th>
+<th align="center">przychod_jednost</th>
 <th align="center">odplyw_klientow</th>
 </tr>
 </thead>
@@ -2474,14 +2603,14 @@ for(category in sort(unique(all_data$category_id))){
 </tbody>
 </table>
 <p>[1] “502”</p>
-<table style="width:74%;">
+<table style="width:81%;">
 <colgroup>
 <col width="6%"></col>
 <col width="6%"></col>
 <col width="6%"></col>
 <col width="6%"></col>
-<col width="20%"></col>
-<col width="25%"></col>
+<col width="26%"></col>
+<col width="26%"></col>
 </colgroup>
 <thead>
 <tr class="header">
@@ -2489,7 +2618,7 @@ for(category in sort(unique(all_data$category_id))){
 <th align="center">42</th>
 <th align="center">49</th>
 <th align="center">59</th>
-<th align="center">srednia_cena</th>
+<th align="center">przychod_jednost</th>
 <th align="center">odplyw_klientow</th>
 </tr>
 </thead>
@@ -2627,83 +2756,275 @@ all_data %&gt;%
 <div id="wnioski" class="section level3">
 <h3>Wnioski</h3>
 <p><strong>Jaka powinna być cena za nasze usługi?</strong></p>
-<p>Z analizy wynika, że im wyższa cena proponowana za pakiet, tym większy odpływ klientów. Jednocześnie im wyższa cena tym wyższy uzyskany przychód jednostkowy. Jak wykazano wcześniej, liczba ogłoszeń wykupionych w danym pakiecie w danej kategorii zależy jednocześnie od cen pozostałych pakietów.</p>
-<p>W poszczególnych kategoriach średnia cena ustalona na podstawie przeprowadzonych testów wynosi:</p>
-<p>102: <strong>27.02</strong></p>
-<p>201: <strong>35.55</strong></p>
-<p>401: <strong>32.69</strong></p>
-<p>502: <strong>31.08</strong></p>
-<p>Czy wprowadzenie nowych cenników nie spowoduje odpływu klientów, jeżeli tak, to jakich strat możemy się spodziewać?</p>
-<p>W załączonych plikach brak informacji o obecnym odpływie klientów</p>
-<p>Czy wyniki są istotne statystycznie, czy jednak serwis powinien prowadzić dalej testy?</p>
+<p>Z analizy wynika, że im wyższa cena proponowana za pakiet, tym większy odpływ klientów. Jednocześnie im wyższa cena tym wyższy uzyskany przychód jednostkowy. Jednakże, jak wykazano wcześniej, liczba ogłoszeń wykupionych w danym pakiecie w danej kategorii zależy jednocześnie od cen pozostałych pakietów, a więc jeśli wprowadzimy zmianę w jednym z nich należy zakładać, że wprowadzenie w kolejnej fazie testów zmiany ceny w innym (w domyśle droższym) pakiecie może mieć również wpływ na sprzedaż pakeitu o cenie niższej.</p>
+<p>Jeśli jednak opierać się tylko na wynikach uzyskanych w przeprowadzonym eksperymentu teście można pokusić się o analizę, czy przychód jednostkowy rozumiany jako średni przychód z ogłoszenia w danej kategorii różni się istotnie statystycznie pomiędzy grupami testowymi. Zadanie to jest o tyle trudne, że nie mówimy tu o rozkładzie normalnym wartości (cen), jak również populacje są z gruntu różne ponieważ ceny podawane grupom testowym były różne. W związku z powyższym proponwany jest test Kruskalla-Wallisa w celu określenia różnic w średniej cenie pomiędzy grupami.</p>
+<pre class="r"><code>kruskal.test(data_all_packages$price,
+             data_all_packages$group_pp) %&gt;% 
+  pander()</code></pre>
+<table style="width:56%;">
+<caption>Kruskal-Wallis rank sum test: <code>data_all_packages$price</code> and <code>data_all_packages$group_pp</code></caption>
+<colgroup>
+<col width="23%"></col>
+<col width="6%"></col>
+<col width="25%"></col>
+</colgroup>
+<thead>
+<tr class="header">
+<th align="center">Test statistic</th>
+<th align="center">df</th>
+<th align="center">P value</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">81.8</td>
+<td align="center">2</td>
+<td align="center">1.731e-18 * * *</td>
+</tr>
+</tbody>
+</table>
+<p>Jak wynika z przeprowadzonego testu średni przychód z ogłoszenia różni sie istotnie pomiędzy grupami. Przychód z ogłoszenia jest najwyższy w trzeciej grupie testowej, a więc dla najwyższej ceny w danej kategorii.</p>
+<p>W poszczególnych kategoriach proponowana na podstawie przeprowadzonych testów cena wynosi:</p>
+<p>102: <strong>59</strong></p>
+<p>201: <strong>69</strong></p>
+<p>401: <strong>69</strong></p>
+<p>502: <strong>59</strong></p>
+<p><strong>Czy wprowadzenie nowych cenników nie spowoduje odpływu klientów, jeżeli tak, to jakich strat możemy się spodziewać?</strong></p>
+<p>Wzrost ceny wiąże się z większym odsetkiem osób rezygnujących z pulikacji ogłoszenia. Warto pokusić się o sprawdzenie, czy różnice w odsetku osób rezygnujących z ogłoszenia jest również istotny statystycznie.</p>
+<pre class="r"><code>data_all_packages %&gt;%
+  mutate(status2 = factor(status, labels = c(0,1),levels = c(&#39;unpaid&#39;,&#39;paid&#39;))) %&gt;% 
+  with(.,kruskal.test(status2, group_pp)) %&gt;% 
+  pander()</code></pre>
+<table style="width:56%;">
+<caption>Kruskal-Wallis rank sum test: <code>status2</code> and <code>group_pp</code></caption>
+<colgroup>
+<col width="23%"></col>
+<col width="6%"></col>
+<col width="25%"></col>
+</colgroup>
+<thead>
+<tr class="header">
+<th align="center">Test statistic</th>
+<th align="center">df</th>
+<th align="center">P value</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">14.07</td>
+<td align="center">2</td>
+<td align="center">0.0008797 * * *</td>
+</tr>
+</tbody>
+</table>
+<p>Również w przypadku różnic w udziale osób rezygnujących z ogłoszenia można stwierdzić statystyczną istotność.</p>
+<p>Wysokość odpływu klientów w zależności od kategorii oraz grupy testowej (ceny pakietu) zaprezentowano już w zakładce <em>Analiza Danych</em>, ale dla przypomnienia:</p>
 <pre class="r"><code>for(category in sort(unique(all_data$category_id))){
-  all_data %&gt;% 
+  print(category)
+  data_price &lt;- all_data %&gt;%
     filter(category_id == category) %&gt;% 
-    lm(formula = price~group_pp) %&gt;%
-    anova() %&gt;% 
+    with(table(group_pp, price))
+
+  data_price &lt;- data_price %&gt;%  
+    as.data.frame.matrix() %&gt;% 
+    mutate(odplyw_klientow = apply(., 1, FUN = calc_decrease_client)) 
+  assign(paste0(&quot;data_price_&quot;,category),data_price)
+
+    data_price %&gt;% 
     pander()
+  
 }</code></pre>
-<pre><code>## 
-## ---------------------------------------------------------------
-##     &amp;nbsp;        Df    Sum Sq    Mean Sq   F value    Pr(&gt;F)  
-## --------------- ------ --------- --------- --------- ----------
-##  **group_pp**     2      6982      3491      6.032    0.002434 
-## 
-##  **Residuals**   2686   1554463    578.7      NA         NA    
-## ---------------------------------------------------------------
-## 
-## Table: Analysis of Variance Table
-## 
-## 
-## -------------------------------------------------------------
-##     &amp;nbsp;       Df    Sum Sq   Mean Sq   F value    Pr(&gt;F)  
-## --------------- ----- -------- --------- --------- ----------
-##  **group_pp**     2     9040     4520      5.454    0.004448 
-## 
-##  **Residuals**   758   628151    828.7      NA         NA    
-## -------------------------------------------------------------
-## 
-## Table: Analysis of Variance Table
-## 
-## 
-## -----------------------------------------------------------
-##     &amp;nbsp;       Df    Sum Sq   Mean Sq   F value   Pr(&gt;F) 
-## --------------- ----- -------- --------- --------- --------
-##  **group_pp**     2     3364     1682      1.983    0.1382 
-## 
-##  **Residuals**   996   844888    848.3      NA        NA   
-## -----------------------------------------------------------
-## 
-## Table: Analysis of Variance Table
-## 
-## 
-## -----------------------------------------------------------
-##     &amp;nbsp;       Df    Sum Sq   Mean Sq   F value   Pr(&gt;F) 
-## --------------- ----- -------- --------- --------- --------
-##  **group_pp**     2     1549     774.7     1.336    0.2643 
-## 
-##  **Residuals**   332   192508    579.8      NA        NA   
-## -----------------------------------------------------------
-## 
-## Table: Analysis of Variance Table</code></pre>
-<p>Pamiętaj, że wyższa cena również niejako motywuje klientów do skorzystania z innych pakietów.</p>
-</div>
-<div id="moje-pytania" class="section level3">
-<h3>Moje pytania</h3>
-</div>
-<div id="dalsze-pytania" class="section level3">
-<h3>Dalsze pytania</h3>
+<p>[1] “102”</p>
+<table style="width:58%;">
+<colgroup>
+<col width="8%"></col>
+<col width="8%"></col>
+<col width="8%"></col>
+<col width="8%"></col>
+<col width="25%"></col>
+</colgroup>
+<thead>
+<tr class="header">
+<th align="center">0</th>
+<th align="center">39</th>
+<th align="center">49</th>
+<th align="center">59</th>
+<th align="center">odplyw_klientow</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">358</td>
+<td align="center">624</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0.36</td>
+</tr>
+<tr class="even">
+<td align="center">426</td>
+<td align="center">0</td>
+<td align="center">558</td>
+<td align="center">0</td>
+<td align="center">0.43</td>
+</tr>
+<tr class="odd">
+<td align="center">374</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">349</td>
+<td align="center">0.52</td>
+</tr>
+</tbody>
+</table>
+<p>[1] “201”</p>
+<table style="width:58%;">
+<colgroup>
+<col width="8%"></col>
+<col width="8%"></col>
+<col width="8%"></col>
+<col width="8%"></col>
+<col width="25%"></col>
+</colgroup>
+<thead>
+<tr class="header">
+<th align="center">0</th>
+<th align="center">49</th>
+<th align="center">59</th>
+<th align="center">69</th>
+<th align="center">odplyw_klientow</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">95</td>
+<td align="center">172</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0.36</td>
+</tr>
+<tr class="even">
+<td align="center">118</td>
+<td align="center">0</td>
+<td align="center">169</td>
+<td align="center">0</td>
+<td align="center">0.41</td>
+</tr>
+<tr class="odd">
+<td align="center">86</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">121</td>
+<td align="center">0.42</td>
+</tr>
+</tbody>
+</table>
+<p>[1] “401”</p>
+<table style="width:65%;">
+<colgroup>
+<col width="8%"></col>
+<col width="6%"></col>
+<col width="8%"></col>
+<col width="8%"></col>
+<col width="8%"></col>
+<col width="25%"></col>
+</colgroup>
+<thead>
+<tr class="header">
+<th align="center">0</th>
+<th align="center">42</th>
+<th align="center">49</th>
+<th align="center">59</th>
+<th align="center">69</th>
+<th align="center">odplyw_klientow</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">139</td>
+<td align="center">1</td>
+<td align="center">233</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0.37</td>
+</tr>
+<tr class="even">
+<td align="center">152</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">182</td>
+<td align="center">0</td>
+<td align="center">0.46</td>
+</tr>
+<tr class="odd">
+<td align="center">143</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">149</td>
+<td align="center">0.49</td>
+</tr>
+</tbody>
+</table>
+<p>[1] “502”</p>
+<table style="width:53%;">
+<colgroup>
+<col width="6%"></col>
+<col width="6%"></col>
+<col width="6%"></col>
+<col width="6%"></col>
+<col width="25%"></col>
+</colgroup>
+<thead>
+<tr class="header">
+<th align="center">0</th>
+<th align="center">42</th>
+<th align="center">49</th>
+<th align="center">59</th>
+<th align="center">odplyw_klientow</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">41</td>
+<td align="center">87</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0.32</td>
+</tr>
+<tr class="even">
+<td align="center">42</td>
+<td align="center">0</td>
+<td align="center">71</td>
+<td align="center">0</td>
+<td align="center">0.37</td>
+</tr>
+<tr class="odd">
+<td align="center">40</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">54</td>
+<td align="center">0.43</td>
+</tr>
+</tbody>
+</table>
+<p>Procentowy udział osób rezygnujących z publikacji ogłoszeń mieści się w zakresie od ok 30 do 50% w zależności od kategorii i grupy testowej.</p>
+<p>Wzrost ceny rekompensuje odpływ klientów, jednak, jak wcześniej pisałem, należy sobie zadać pytanie co jest ważniejsze: przychód w danym momencie, czy stabilny udział w rynku.</p>
+<p><strong>Czy wyniki są istotne statystycznie, czy jednak serwis powinien prowadzić dalej testy?</strong></p>
+<p>Choć wyniki są istotne statystycznie należy kontynuować testy jednak zmieniając ceny pozostałych pakietów i poszukując optimum ceny w stosunku do sprzedaży. Należy dobrze zastanowić się nad metrykami, które chce się optymalizować. Maksymalny przychód z ogłoszeń może oznaczać istotnie mniejszy udział na rynku ze względu na liczbę klientów, która może przenieść się do konkurencji i w dłuższej perspektywie czasowej może spowodować dodatnie sprzężenie zwrotne w postaci narastającego odpływu klientów. Pojawia się w związku z tym szereg pytań, które zostały zaprezentowane poniżej:</p>
 <ol style="list-style-type: decimal">
-<li>Co wpływa na wybór pakietu,</li>
-<li>Czy da się opracować model szacujący maksymalną wysokość ceny pakietu dla poszczególnych klientów?</li>
+<li>Jaki jest maksymalny odpływ klientów dopuszczalny przez firmę w danej kategorii (lub inaczej mówiąc: jaki udział rynku możemy oddać konkurencji)?</li>
+<li>Co wpływa na wybór pakietu? Czy istnieje relacja pomiędzy wiekiem, płcią i wykształceniem, a decyzją o kupnie pakietu w danej kategorii? Czy miejsce zamieszkania może stanowić proxy zamożności klienta i jednocześnie wpływać na wartość pakietu jaką jest gotów zapłacić?</li>
+<li>Czy da się opracować model szacujący maksymalną wysokość ceny pakietu dla poszczególnych klientów? nie wykluczone, że zależność pomiędzy przychodem a ceną posiada kształt funkcji zbliżonej do normalnej krzywej Gaussa, gdzie punkt maksymalnego przychodu jest jednocześnie punktem, w którym wysokość ceny sprawia, że więcej osób rezygnuje z ogłoszenia niż zwraca się koszt tych ogłoszeń w jego cenie.</li>
+<li>Jeżeli takie cechy jak płeć, czy wiek wpływają na gotowość zakupu droższego pakietu, czy prezentowanie różnych cen na podstawie tych cech jest legalne i moralnie właściwe, czy stanowi swego rodzaju dyskryminację?</li>
 </ol>
 </div>
 <div id="dalszy-rozwój-rozwiązania" class="section level3">
 <h3>Dalszy rozwój rozwiązania</h3>
 <ol style="list-style-type: decimal">
-<li>Przeprowadzenie testów, gdzie każda grupa testowa ma tylko jeden zaproponowany wariant cenowy.</li>
-<li>Proponowane rozwiązanie można <strong>usprawnić zamykając je w kontenerze i umieszczając na serwerze udostępniając jednocześnie komnikację z narzędziem poprzez REST</strong>.</li>
+<li>Przeprowadzenie kolejnych testów ze zmianami cen w pozostałych pakietach.</li>
+<li>Proponowane rozwiązanie można <strong>usprawnić zamykając je w kontenerze (dockeryzacja) i umieszczając na serwerze udostępniając jednocześnie komunikację z utworzonym narzędziem poprzez REST</strong>.</li>
 <li>Zbudowanie <strong>aplikacji Shiny</strong>, w której można będzie zdefiniować maksymalny dopuszczalny poziom odpływu klientów, by zwizualizować szacowany zysk przy danej cenie.</li>
+<li>Zbudowanie zespołu analitycznego, do zaplanowania długofalowego, wielofazowego eksperymentu oraz możliwości statystycznej analizy danych.</li>
 </ol>
 </div>
 </div>
